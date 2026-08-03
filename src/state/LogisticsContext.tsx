@@ -12,22 +12,27 @@ import type { LogisticsDerived } from "../types/logistics";
 import { loadDays, saveDays, todayISO, type DaysStore } from "../lib/storage";
 
 const DEFAULT_TEAMS: TeamConfig[] = [
-  { id: "matin", label: "Équipe Matin", start: "05:00", end: "12:36", headcount: 8 },
+  { id: "matin", label: "Équipe Matin", start: "05:00", end: "12:36", headcount: 0 },
   {
     id: "apresmidi",
     label: "Équipe Après-midi",
     start: "12:24",
     end: "20:00",
-    headcount: 7,
+    headcount: 0,
   },
-  { id: "journee", label: "Équipe Journée", start: "07:00", end: "15:36", headcount: 4 },
+  { id: "journee", label: "Équipe Journée", start: "07:00", end: "15:36", headcount: 0 },
 ];
 
+// Seules les cadences sont préremplies (valeurs machine/process typiques) ;
+// volumes du jour et effectifs démarrent à 0, à saisir pour chaque journée.
 export const DEFAULT_INPUTS: LogisticsInputs = {
-  siloPalettes: 420,
+  siloPalettes: 0,
   siloCadence: 18,
-  pickingColis: 8200,
+  siloEfficiencyPct: 100,
+  siloDowntimeHours: 0,
+  pickingColis: 0,
   pickingCadence: 400,
+  pickingEfficiencyPct: 100,
   teams: DEFAULT_TEAMS,
 };
 
@@ -40,12 +45,17 @@ interface LogisticsContextValue {
   derived: LogisticsDerived;
   setSiloPalettes: (v: number) => void;
   setSiloCadence: (v: number) => void;
+  setSiloEfficiencyPct: (v: number) => void;
+  setSiloDowntimeHours: (v: number) => void;
   setPickingColis: (v: number) => void;
   setPickingCadence: (v: number) => void;
+  setPickingEfficiencyPct: (v: number) => void;
   setTeamHeadcount: (id: TeamConfig["id"], headcount: number) => void;
   reset: () => void;
   /** Journées enregistrées, triées chronologiquement, avec leur statut calculé. */
   savedDays: { date: string; status: LogisticsDerived["status"] }[];
+  /** Saisie brute de toutes les journées (clé = date ISO), pour les vues de projection. */
+  store: DaysStore;
   selectedDate: string;
   selectDate: (date: string) => void;
   deleteDay: (date: string) => void;
@@ -89,9 +99,15 @@ export function LogisticsProvider({ children }: { children: ReactNode }) {
     derived,
     setSiloPalettes: (v) => updateCurrent((prev) => ({ ...prev, siloPalettes: Math.max(0, v) })),
     setSiloCadence: (v) => updateCurrent((prev) => ({ ...prev, siloCadence: Math.max(0, v) })),
+    setSiloEfficiencyPct: (v) =>
+      updateCurrent((prev) => ({ ...prev, siloEfficiencyPct: Math.max(0, v) })),
+    setSiloDowntimeHours: (v) =>
+      updateCurrent((prev) => ({ ...prev, siloDowntimeHours: Math.max(0, v) })),
     setPickingColis: (v) => updateCurrent((prev) => ({ ...prev, pickingColis: Math.max(0, v) })),
     setPickingCadence: (v) =>
       updateCurrent((prev) => ({ ...prev, pickingCadence: Math.max(0, v) })),
+    setPickingEfficiencyPct: (v) =>
+      updateCurrent((prev) => ({ ...prev, pickingEfficiencyPct: Math.max(0, v) })),
     setTeamHeadcount: (id, headcount) =>
       updateCurrent((prev) => ({
         ...prev,
@@ -101,6 +117,7 @@ export function LogisticsProvider({ children }: { children: ReactNode }) {
       })),
     reset: () => updateCurrent(() => cloneInputs(DEFAULT_INPUTS)),
     savedDays,
+    store,
     selectedDate,
     selectDate: (date) => {
       setStore((prev) => {

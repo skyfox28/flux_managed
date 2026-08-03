@@ -22,6 +22,12 @@ export function PickingCard() {
         <span className="text-sm text-slate-400">colis</span>
       </div>
       <StatRow label="Cadence" value={`${inputs.pickingCadence} colis/h/prépa`} />
+      {inputs.pickingEfficiencyPct !== 100 && (
+        <StatRow
+          label="Efficacité"
+          value={`${inputs.pickingEfficiencyPct}% → ${Math.round(derived.pickingEffectiveCadence)} colis/h eff.`}
+        />
+      )}
       <StatRow label="Préparateurs dispo" value={derived.totalPreparateurs} />
       <StatRow
         label="Temps estimé (parallèle)"

@@ -18,12 +18,31 @@ export function addDaysISO(dateISO: string, delta: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** Complète les champs ajoutés après coup, pour une saisie déjà stockée localement. */
+function normalizeInputs(inputs: Partial<LogisticsInputs>): LogisticsInputs {
+  return {
+    siloPalettes: inputs.siloPalettes ?? 0,
+    siloCadence: inputs.siloCadence ?? 18,
+    siloEfficiencyPct: inputs.siloEfficiencyPct ?? 100,
+    siloDowntimeHours: inputs.siloDowntimeHours ?? 0,
+    pickingColis: inputs.pickingColis ?? 0,
+    pickingCadence: inputs.pickingCadence ?? 400,
+    pickingEfficiencyPct: inputs.pickingEfficiencyPct ?? 100,
+    teams: inputs.teams ?? [],
+  };
+}
+
 export function loadDays(): DaysStore {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed ? parsed : {};
+    if (typeof parsed !== "object" || !parsed) return {};
+    const normalized: DaysStore = {};
+    for (const [date, inputs] of Object.entries(parsed as DaysStore)) {
+      normalized[date] = normalizeInputs(inputs);
+    }
+    return normalized;
   } catch {
     return {};
   }

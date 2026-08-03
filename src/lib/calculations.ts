@@ -19,6 +19,10 @@ export function teamDurationHours(start: string, end: string): number {
   return diff >= 0 ? diff : diff + 24;
 }
 
+/** Pauses réglementaires par poste : une pause de 10 min + une pause de 20 min. */
+export const BREAK_MINUTES_PER_SHIFT = 10 + 20;
+export const BREAK_HOURS_PER_SHIFT = BREAK_MINUTES_PER_SHIFT / 60;
+
 export const OCCUPANCY_THRESHOLDS = {
   warning: 80,
   critical: 100,
@@ -37,9 +41,10 @@ function safeDiv(a: number, b: number): number {
 
 export function computeLogistics(inputs: LogisticsInputs): LogisticsDerived {
   const teams: TeamDerived[] = inputs.teams.map((team) => {
-    const durationHours = teamDurationHours(team.start, team.end);
+    const grossDurationHours = teamDurationHours(team.start, team.end);
+    const durationHours = Math.max(0, grossDurationHours - BREAK_HOURS_PER_SHIFT);
     const capacityHours = durationHours * Math.max(0, team.headcount);
-    return { ...team, durationHours, capacityHours };
+    return { ...team, grossDurationHours, durationHours, capacityHours };
   });
 
   const totalPreparateurs = teams.reduce(
@@ -48,13 +53,19 @@ export function computeLogistics(inputs: LogisticsInputs): LogisticsDerived {
   );
   const totalCapacityHours = teams.reduce((sum, t) => sum + t.capacityHours, 0);
 
-  // SILO : temps de sortie du magasin automatique (ressource dédiée), indépendant des effectifs picking.
-  const siloTimeHours = safeDiv(inputs.siloPalettes, inputs.siloCadence);
+  // SILO : temps de sortie du magasin automatique (ressource dédiée), indépendant des
+  // effectifs picking. La cadence nominale est modulée par l'efficacité réelle (aléas
+  // humains/machine : pics au-dessus ou en-dessous de la cadence de référence), et un
+  // arrêt silo (panne) s'ajoute directement au temps nécessaire.
+  const siloEffectiveCadence = inputs.siloCadence * (Math.max(0, inputs.siloEfficiencyPct) / 100);
+  const siloDowntimeHours = Math.max(0, inputs.siloDowntimeHours);
+  const siloTimeHours = safeDiv(inputs.siloPalettes, siloEffectiveCadence) + siloDowntimeHours;
   const siloChargeHours = siloTimeHours; // mobilise l'équivalent d'1 préparateur pendant ce temps
 
-  // Picking : la cadence est "par préparateur" -> charge totale en préparateur-heures,
-  // et durée réelle si tous les préparateurs disponibles picken en parallèle.
-  const pickingChargeHours = safeDiv(inputs.pickingColis, inputs.pickingCadence);
+  // Picking : la cadence (par préparateur) est également modulée par l'efficacité réelle.
+  const pickingEffectiveCadence =
+    inputs.pickingCadence * (Math.max(0, inputs.pickingEfficiencyPct) / 100);
+  const pickingChargeHours = safeDiv(inputs.pickingColis, pickingEffectiveCadence);
   const pickingTimeHours = safeDiv(pickingChargeHours, totalPreparateurs);
 
   const totalChargeHours = siloChargeHours + pickingChargeHours;
@@ -68,8 +79,10 @@ export function computeLogistics(inputs: LogisticsInputs): LogisticsDerived {
   return {
     totalPreparateurs,
     teams,
+    siloEffectiveCadence,
     siloTimeHours,
     siloChargeHours,
+    pickingEffectiveCadence,
     pickingTimeHours,
     pickingChargeHours,
     totalChargeHours,

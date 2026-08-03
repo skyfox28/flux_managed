@@ -22,6 +22,19 @@ export function SiloCard() {
         <span className="text-sm text-slate-400">palettes à sortir</span>
       </div>
       <StatRow label="Cadence de sortie" value={`${inputs.siloCadence} pal/h`} />
+      {inputs.siloEfficiencyPct !== 100 && (
+        <StatRow
+          label="Efficacité"
+          value={`${inputs.siloEfficiencyPct}% → ${Math.round(derived.siloEffectiveCadence)} pal/h eff.`}
+        />
+      )}
+      {inputs.siloDowntimeHours > 0 && (
+        <StatRow
+          label="Arrêt silo (panne)"
+          value={`+${formatHoursMinutes(inputs.siloDowntimeHours)}`}
+          tone="warning"
+        />
+      )}
       <StatRow
         label="Temps estimé"
         value={formatHoursMinutes(derived.siloTimeHours)}

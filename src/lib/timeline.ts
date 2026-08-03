@@ -49,10 +49,12 @@ export function buildDayTimeline(derived: LogisticsDerived): HourPoint[] {
   let cumCharge = 0;
 
   return hours.map((hour, i) => {
-    const capacity = derived.teams.reduce(
-      (sum, t) => sum + presenceFraction(t, hour) * Math.max(0, t.headcount),
-      0,
-    );
+    const capacity = derived.teams.reduce((sum, t) => {
+      // Les pauses (30 min/poste) sont réparties proportionnellement sur les
+      // heures de présence de l'équipe, faute de granularité horaire exacte.
+      const breakFactor = t.grossDurationHours > 0 ? t.durationHours / t.grossDurationHours : 0;
+      return sum + presenceFraction(t, hour) * Math.max(0, t.headcount) * breakFactor;
+    }, 0);
     const charge = (weights[i] / weightSum) * derived.totalChargeHours;
     const occupancy = capacity > 0 ? (charge / capacity) * 100 : charge > 0 ? 150 : 0;
 

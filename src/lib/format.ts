@@ -30,3 +30,11 @@ export function formatHoursMinutes(hoursDecimal: number): string {
 export function formatPercent(value: number, digits = 0): string {
   return `${formatDecimal(value, digits)}%`;
 }
+
+/** Formate une date ISO "YYYY-MM-DD" en "lun 03 août". */
+export function formatDayLabel(date: string): string {
+  const d = new Date(`${date}T00:00:00`);
+  return d
+    .toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" })
+    .replace(".", "");
+}

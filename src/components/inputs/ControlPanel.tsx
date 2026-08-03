@@ -1,4 +1,12 @@
-import { Boxes, Package, RotateCcw, SlidersHorizontal, Users } from "lucide-react";
+import {
+  Activity,
+  Boxes,
+  Package,
+  RotateCcw,
+  SlidersHorizontal,
+  Users,
+  Wrench,
+} from "lucide-react";
 import { GlassCard } from "../ui/GlassCard";
 import { SectionTitle } from "../ui/StatRow";
 import { SliderField } from "./SliderField";
@@ -9,8 +17,11 @@ export function ControlPanel() {
     inputs,
     setSiloPalettes,
     setSiloCadence,
+    setSiloEfficiencyPct,
+    setSiloDowntimeHours,
     setPickingColis,
     setPickingCadence,
+    setPickingEfficiencyPct,
     setTeamHeadcount,
     reset,
   } = useLogistics();
@@ -56,6 +67,26 @@ export function ControlPanel() {
           icon={<Package className="h-3.5 w-3.5" />}
           onChange={setSiloCadence}
         />
+        <SliderField
+          label="Efficacité (humain/machine)"
+          value={inputs.siloEfficiencyPct}
+          min={50}
+          max={150}
+          step={5}
+          unit="%"
+          icon={<Activity className="h-3.5 w-3.5" />}
+          onChange={setSiloEfficiencyPct}
+        />
+        <SliderField
+          label="Arrêt silo (panne)"
+          value={inputs.siloDowntimeHours}
+          min={0}
+          max={12}
+          step={0.5}
+          unit="h"
+          icon={<Wrench className="h-3.5 w-3.5" />}
+          onChange={setSiloDowntimeHours}
+        />
       </div>
 
       <div className="mt-2 space-y-1 border-t border-white/5 pt-2">
@@ -81,6 +112,16 @@ export function ControlPanel() {
           unit="colis/h"
           icon={<Boxes className="h-3.5 w-3.5" />}
           onChange={setPickingCadence}
+        />
+        <SliderField
+          label="Efficacité (humain/machine)"
+          value={inputs.pickingEfficiencyPct}
+          min={50}
+          max={150}
+          step={5}
+          unit="%"
+          icon={<Activity className="h-3.5 w-3.5" />}
+          onChange={setPickingEfficiencyPct}
         />
       </div>
 

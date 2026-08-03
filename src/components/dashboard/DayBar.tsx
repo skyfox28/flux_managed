@@ -2,19 +2,13 @@ import { CalendarDays, Plus, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLogistics } from "../../state/LogisticsContext";
 import { addDaysISO } from "../../lib/storage";
+import { formatDayLabel } from "../../lib/format";
 
 const STATUS_DOT: Record<string, string> = {
   ok: "bg-emerald-400",
   warning: "bg-orange-400",
   critical: "bg-rose-400",
 };
-
-function formatChip(date: string): string {
-  const d = new Date(`${date}T00:00:00`);
-  return d
-    .toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" })
-    .replace(".", "");
-}
 
 export function DayBar() {
   const { savedDays, selectedDate, selectDate, deleteDay } = useLogistics();
@@ -57,7 +51,7 @@ export function DayBar() {
             }`}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[status]}`} />
-            {formatChip(date)}
+            {formatDayLabel(date)}
             {savedDays.length > 1 && (
               <span
                 role="button"

@@ -8,6 +8,7 @@ import { SiloCard } from "./components/dashboard/SiloCard";
 import { PickingCard } from "./components/dashboard/PickingCard";
 import { ResourcesCard } from "./components/dashboard/ResourcesCard";
 import { CapacitySummaryCard } from "./components/dashboard/CapacitySummaryCard";
+import { CongestionForecast } from "./components/dashboard/CongestionForecast";
 import { ControlPanel } from "./components/inputs/ControlPanel";
 import { LoadCurveChart } from "./components/charts/LoadCurveChart";
 import { SiloPickingBarChart } from "./components/charts/SiloPickingBarChart";
@@ -39,6 +40,8 @@ function App() {
               <ResourcesCard />
               <CapacitySummaryCard />
             </div>
+
+            <CongestionForecast />
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
               <LoadCurveChart />

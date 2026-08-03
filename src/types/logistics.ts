@@ -12,28 +12,39 @@ export interface TeamConfig {
 
 export interface LogisticsInputs {
   siloPalettes: number;
-  siloCadence: number; // palettes / heure
+  siloCadence: number; // palettes / heure (nominale)
+  /** Efficacité réelle vs cadence nominale (aléas humains/machine) : 100 = nominal. */
+  siloEfficiencyPct: number;
+  /** Panne(s) magasin automatique : heures d'arrêt du silo ce jour-là. */
+  siloDowntimeHours: number;
   pickingColis: number;
-  pickingCadence: number; // colis / heure / préparateur
+  pickingCadence: number; // colis / heure / préparateur (nominale)
+  /** Efficacité réelle vs cadence nominale (aléas humains/machine) : 100 = nominal. */
+  pickingEfficiencyPct: number;
   teams: TeamConfig[];
 }
 
 export type OccupancyStatus = "ok" | "warning" | "critical";
 
 export interface TeamDerived extends TeamConfig {
+  /** Durée brute de l'équipe (horaire de prise/fin de poste), sans les pauses. */
+  grossDurationHours: number;
+  /** Durée effective de travail, pauses déduites (10 + 20 min). */
   durationHours: number;
-  capacityHours: number; // durationHours * headcount
+  capacityHours: number; // durationHours (effective) * headcount
 }
 
 export interface LogisticsDerived {
   totalPreparateurs: number;
   teams: TeamDerived[];
 
-  siloTimeHours: number; // palettes / cadenceSilo
+  siloEffectiveCadence: number; // cadence nominale × efficacité
+  siloTimeHours: number; // palettes / cadence effective + arrêt silo
   siloChargeHours: number; // person-hours mobilized by SILO
 
-  pickingTimeHours: number; // colis / (cadence * totalPrepa) — durée si tous en picking
-  pickingChargeHours: number; // colis / cadence — person-hours mobilized by picking
+  pickingEffectiveCadence: number; // cadence nominale × efficacité
+  pickingTimeHours: number; // colis / (cadence effective × totalPrepa) — durée si tous en picking
+  pickingChargeHours: number; // colis / cadence effective — person-hours mobilized by picking
 
   totalChargeHours: number;
   totalCapacityHours: number;

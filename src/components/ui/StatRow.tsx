@@ -5,10 +5,16 @@ interface StatRowProps {
   label: string;
   value: ReactNode;
   accent?: boolean;
+  tone?: "warning" | "critical";
   className?: string;
 }
 
-export function StatRow({ label, value, accent, className }: StatRowProps) {
+const TONE_CLASS: Record<NonNullable<StatRowProps["tone"]>, string> = {
+  warning: "text-orange-300",
+  critical: "text-rose-300",
+};
+
+export function StatRow({ label, value, accent, tone, className }: StatRowProps) {
   return (
     <div
       className={clsx(
@@ -20,7 +26,7 @@ export function StatRow({ label, value, accent, className }: StatRowProps) {
       <span
         className={clsx(
           "font-display tabular-nums text-sm font-semibold",
-          accent ? "text-electric-300" : "text-slate-100",
+          tone ? TONE_CLASS[tone] : accent ? "text-electric-300" : "text-slate-100",
         )}
       >
         {value}

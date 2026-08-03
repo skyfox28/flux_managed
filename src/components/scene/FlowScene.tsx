@@ -137,8 +137,8 @@ function Scene() {
         infiniteGrid
       />
 
-      {/* SILO */}
-      <Station position={[-4.6, 0, 0]} label="Silo">
+      {/* SILO — magasin automatique : source du flux (sortie palettes) */}
+      <Station position={[-4.6, 0, 0]} label="Silo (sortie)">
         <mesh>
           <cylinderGeometry args={[0.6, 0.7, 1.7, 24]} />
           <meshPhysicalMaterial
@@ -187,21 +187,13 @@ function Scene() {
         </mesh>
       </Station>
 
-      {/* flux : entrée -> silo */}
-      <ParticleStream
-        start={[-7.4, 0.15, 0]}
-        end={[-4.8, 0.15, 0]}
-        count={6}
-        speed={siloSpeed}
-        color="#38bdf8"
-      />
-      {/* flux : silo -> picking */}
+      {/* flux : sortie silo (magasin automatique) -> picking */}
       <ParticleStream
         start={[-4.4, 0.15, 0]}
         end={[-0.4, 0.15, 0]}
         count={6}
         speed={siloSpeed}
-        color="#7fd9ff"
+        color="#38bdf8"
       />
       {/* flux : picking -> expédition (colis) */}
       <ParticleStream

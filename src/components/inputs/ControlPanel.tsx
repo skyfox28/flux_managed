@@ -34,20 +34,20 @@ export function ControlPanel() {
 
       <div className="mt-2 space-y-1 border-t border-white/5 pt-2">
         <p className="pt-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-electric-400">
-          SILO
+          SILO · magasin automatique
         </p>
         <SliderField
-          label="Palettes"
+          label="Palettes à sortir"
           value={inputs.siloPalettes}
           min={0}
-          max={1500}
+          max={3000}
           step={10}
           unit="pal"
           icon={<Package className="h-3.5 w-3.5" />}
           onChange={setSiloPalettes}
         />
         <SliderField
-          label="Cadence SILO"
+          label="Cadence de sortie"
           value={inputs.siloCadence}
           min={1}
           max={60}
@@ -66,8 +66,8 @@ export function ControlPanel() {
           label="Colis"
           value={inputs.pickingColis}
           min={0}
-          max={20000}
-          step={50}
+          max={100000}
+          step={100}
           unit="colis"
           icon={<Boxes className="h-3.5 w-3.5" />}
           onChange={setPickingColis}

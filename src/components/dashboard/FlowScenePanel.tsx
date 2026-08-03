@@ -9,7 +9,7 @@ export function FlowScenePanel() {
       <SectionTitle
         icon={<Waypoints className="h-5 w-5" strokeWidth={2} />}
         title="Flux logistique en temps réel"
-        subtitle="Palettes → Silo → Picking → Expéditions"
+        subtitle="Silo (magasin automatique) → Picking → Expéditions"
       />
       <div className="min-h-[300px] flex-1">
         <FlowScene />

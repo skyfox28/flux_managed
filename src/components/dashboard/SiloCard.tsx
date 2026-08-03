@@ -13,15 +13,15 @@ export function SiloCard() {
       <SectionTitle
         icon={<Package className="h-5 w-5" strokeWidth={2} />}
         title="Activité SILO"
-        subtitle="Réception & stockage palettes"
+        subtitle="Sorties magasin automatique"
       />
       <div className="mb-3 flex items-baseline gap-2">
         <span className="font-display text-3xl font-bold tabular-nums text-white">
           <AnimatedNumber value={inputs.siloPalettes} />
         </span>
-        <span className="text-sm text-slate-400">palettes</span>
+        <span className="text-sm text-slate-400">palettes à sortir</span>
       </div>
-      <StatRow label="Cadence" value={`${inputs.siloCadence} pal/h`} />
+      <StatRow label="Cadence de sortie" value={`${inputs.siloCadence} pal/h`} />
       <StatRow
         label="Temps estimé"
         value={formatHoursMinutes(derived.siloTimeHours)}

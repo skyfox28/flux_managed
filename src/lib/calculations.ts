@@ -48,7 +48,7 @@ export function computeLogistics(inputs: LogisticsInputs): LogisticsDerived {
   );
   const totalCapacityHours = teams.reduce((sum, t) => sum + t.capacityHours, 0);
 
-  // SILO : temps de traitement du flux (ressource dédiée), indépendant des effectifs picking.
+  // SILO : temps de sortie du magasin automatique (ressource dédiée), indépendant des effectifs picking.
   const siloTimeHours = safeDiv(inputs.siloPalettes, inputs.siloCadence);
   const siloChargeHours = siloTimeHours; // mobilise l'équivalent d'1 préparateur pendant ce temps
 

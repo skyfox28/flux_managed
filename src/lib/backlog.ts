@@ -1,13 +1,9 @@
 import { computeLogistics, occupancyStatus } from "./calculations";
-import { predictDay, type PredictionConfidence } from "./prediction";
 import { addDaysISO, type DaysStore } from "./storage";
 import type { LogisticsInputs } from "../types/logistics";
 
 export interface DayForecast {
   date: string;
-  /** "real" = saisi par l'utilisateur, "predicted" = estimé par l'algorithme de prévision. */
-  source: "real" | "predicted";
-  confidence?: PredictionConfidence;
   own: ReturnType<typeof computeLogistics>;
 
   /** Report humain (préparateur-heures) reçu de la veille. */
@@ -71,11 +67,9 @@ function applyDay(
 /**
  * Calcule la chaîne de report de charge (effet boule de neige) sur `horizonDays`
  * jours à partir de `startDate`, avec deux files indépendantes (silo / humain).
- * Les jours réellement saisis utilisent la saisie ; les jours suivants non saisis
- * sont estimés par `predictDay` (moyenne pondérée par récence + tendance +
- * saisonnalité, à partir de l'historique réel uniquement) et clairement distingués
- * via `source: "predicted"`. Si aucun historique n'existe encore, la chaîne s'arrête
- * plutôt que d'inventer une donnée sans base.
+ * Ne calcule et n'affiche que les jours réellement saisis, chaînés consécutivement
+ * depuis `startDate` — dès qu'un jour n'a pas de saisie, la chaîne s'arrête (aucune
+ * donnée n'est inventée pour les jours suivants).
  */
 export function computeForecastChain(
   store: DaysStore,
@@ -107,28 +101,13 @@ export function computeForecastChain(
   let date = startDate;
 
   for (let i = 0; i < horizonDays; i++) {
-    const real = store[date];
-    let source: DayForecast["source"];
-    let confidence: PredictionConfidence | undefined;
-    let inputs: LogisticsInputs;
-
-    if (real) {
-      source = "real";
-      inputs = real;
-    } else {
-      const prediction = predictDay(store, date);
-      if (!prediction) break; // pas d'historique du tout -> rien de fiable à afficher
-      source = "predicted";
-      confidence = prediction.confidence;
-      inputs = prediction.inputs;
-    }
+    const inputs = store[date];
+    if (!inputs) break; // jour non saisi -> on arrête, rien n'est inventé
 
     const step = applyDay(inputs, humanBacklog, siloBacklog);
 
     results.push({
       date,
-      source,
-      confidence,
       own: step.own,
       backlogIn: humanBacklog,
       totalCharge: step.totalChargeToday,

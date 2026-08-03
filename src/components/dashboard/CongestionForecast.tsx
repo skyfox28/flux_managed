@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { ArrowDownRight, ArrowUpRight, Boxes, Pencil, Sparkles, Snowflake } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Boxes, Snowflake } from "lucide-react";
 import clsx from "clsx";
 import { GlassCard } from "../ui/GlassCard";
 import { SectionTitle } from "../ui/StatRow";
@@ -16,15 +16,7 @@ const STATUS_STYLE: Record<string, { text: string; bar: string; ring: string }> 
   critical: { text: "text-rose-300", bar: "bg-rose-400", ring: "ring-rose-400/15" },
 };
 
-const CONFIDENCE_LABEL: Record<string, string> = {
-  low: "confiance faible",
-  medium: "confiance moyenne",
-  high: "confiance haute",
-};
-
 function DayCard({ day }: { day: DayForecast }) {
-  const { selectDate } = useLogistics();
-  const predicted = day.source === "predicted";
   const style = STATUS_STYLE[day.status];
   const capacity = day.own.totalCapacityHours || 1;
   // Au-delà de la capacité, on normalise les deux segments sur le total à traiter
@@ -37,34 +29,20 @@ function DayCard({ day }: { day: DayForecast }) {
   return (
     <div
       className={clsx(
-        "group relative flex w-[140px] shrink-0 flex-col gap-1.5 rounded-xl border bg-white/[0.03] p-2.5 ring-1",
-        predicted ? "border-dashed border-white/12" : "border-white/8",
+        "flex w-[140px] shrink-0 flex-col gap-1.5 rounded-xl border border-white/8 bg-white/[0.03] p-2.5 ring-1",
         style.ring,
       )}
-      title={
-        predicted
-          ? `Prédiction (${CONFIDENCE_LABEL[day.confidence ?? "low"]}) · ${formatPercent(day.occupancyWithBacklog)} si ~${Math.round(day.own.totalChargeHours)}h de charge`
-          : `Charge propre ${formatHoursMinutes(day.own.totalChargeHours)} · Capacité ${formatHoursMinutes(day.own.totalCapacityHours)}`
-      }
+      title={`Charge propre ${formatHoursMinutes(day.own.totalChargeHours)} · Capacité ${formatHoursMinutes(day.own.totalCapacityHours)}`}
     >
       <div className="flex items-center justify-between">
-        <span
-          className={clsx(
-            "font-display text-xs font-semibold capitalize",
-            predicted ? "text-slate-400" : "text-slate-100",
-          )}
-        >
+        <span className="font-display text-xs font-semibold capitalize text-slate-100">
           {formatDayLabel(day.date)}
         </span>
-        {predicted ? (
-          <Sparkles className="h-3 w-3 text-cyan-400/70" />
-        ) : (
-          <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
-        )}
+        <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
       </div>
 
       <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
-        <div className={clsx("flex h-full w-full", predicted && "opacity-60")}>
+        <div className="flex h-full w-full">
           {backlogPct > 0 && (
             <div className="h-full bg-orange-400/80" style={{ width: `${backlogPct}%` }} />
           )}
@@ -72,12 +50,7 @@ function DayCard({ day }: { day: DayForecast }) {
         </div>
       </div>
 
-      <div
-        className={clsx(
-          "font-display text-lg font-bold tabular-nums",
-          predicted ? "text-slate-300" : style.text,
-        )}
-      >
+      <div className={clsx("font-display text-lg font-bold tabular-nums", style.text)}>
         {formatPercent(day.occupancyWithBacklog)}
       </div>
 
@@ -103,20 +76,6 @@ function DayCard({ day }: { day: DayForecast }) {
           </span>
         )}
       </div>
-
-      {predicted ? (
-        <button
-          onClick={() => selectDate(day.date)}
-          className="mt-0.5 flex items-center justify-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[10px] text-slate-500 transition-colors hover:border-cyan-300/30 hover:text-cyan-300"
-        >
-          <Pencil className="h-2.5 w-2.5" />
-          Prédit · {CONFIDENCE_LABEL[day.confidence ?? "low"]}
-        </button>
-      ) : (
-        <span className="mt-0.5 text-center text-[10px] uppercase tracking-wide text-slate-600">
-          Saisi
-        </span>
-      )}
     </div>
   );
 }
@@ -128,8 +87,6 @@ export function CongestionForecast() {
     [store, selectedDate],
   );
 
-  const realCount = chain.filter((d) => d.source === "real").length;
-  const predictedCount = chain.length - realCount;
   const lastKnown = chain[chain.length - 1];
   const isSnowballing = Boolean(lastKnown?.congested);
   const isSiloSnowballing = Boolean(lastKnown?.siloCongested);
@@ -149,7 +106,7 @@ export function CongestionForecast() {
         <SectionTitle
           icon={<Snowflake className="h-5 w-5" strokeWidth={2} />}
           title="Vision semaine · effet boule de neige"
-          subtitle={`${realCount} jour${realCount > 1 ? "s" : ""} saisi${realCount > 1 ? "s" : ""} · ${predictedCount} prédit${predictedCount > 1 ? "s" : ""} à partir de l'historique`}
+          subtitle={`${chain.length} jour${chain.length > 1 ? "s" : ""} saisi${chain.length > 1 ? "s" : ""} — se complète au fur et à mesure de la saisie`}
         />
         <span
           className={clsx(
@@ -159,7 +116,7 @@ export function CongestionForecast() {
         >
           {anySnowballing
             ? `Congestion — ${messages.join(" + ")} non absorbées après le ${formatDayLabel(lastKnown.date)}`
-            : "Aucune accumulation sur l'horizon"}
+            : "Aucune accumulation sur les jours saisis"}
         </span>
       </div>
 
@@ -174,8 +131,7 @@ export function CongestionForecast() {
         ))}
         {chain.length === 0 && (
           <p className="py-4 text-sm text-slate-500">
-            Aucune donnée à projeter — saisissez au moins une journée pour démarrer la
-            prévision.
+            Aucune donnée — saisissez la journée pour démarrer la vision semaine.
           </p>
         )}
       </motion.div>

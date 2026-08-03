@@ -11,6 +11,12 @@ export function todayISO(): string {
   return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 10);
 }
 
+/** Heure actuelle en décimal (ex. 14h30 -> 14.5), heure locale du navigateur. */
+export function nowDecimalHours(): number {
+  const d = new Date();
+  return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+}
+
 /** Additionne `delta` jours à une date calendaire "YYYY-MM-DD", sans effet de fuseau horaire. */
 export function addDaysISO(dateISO: string, delta: number): string {
   const [y, m, d] = dateISO.split("-").map(Number);

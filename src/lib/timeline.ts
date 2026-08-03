@@ -51,8 +51,12 @@ export function buildDayTimeline(derived: LogisticsDerived): HourPoint[] {
   return hours.map((hour, i) => {
     const capacity = derived.teams.reduce((sum, t) => {
       // Les pauses (30 min/poste) sont réparties proportionnellement sur les
-      // heures de présence de l'équipe, faute de granularité horaire exacte.
-      const breakFactor = t.grossDurationHours > 0 ? t.durationHours / t.grossDurationHours : 0;
+      // heures de présence de l'équipe, faute de granularité horaire exacte. On
+      // utilise volontairement le ratio "pauses seules" (plein jour) et non
+      // `durationHours`, qui peut être réduit à l'heure actuelle sur la journée en
+      // cours : ce profil horaire reste le profil théorique de la journée entière.
+      const breakFactor =
+        t.grossDurationHours > 0 ? t.breakAdjustedDurationHours / t.grossDurationHours : 0;
       return sum + presenceFraction(t, hour) * Math.max(0, t.headcount) * breakFactor;
     }, 0);
     const charge = (weights[i] / weightSum) * derived.totalChargeHours;

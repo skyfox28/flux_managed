@@ -9,7 +9,7 @@ import {
 import type { LogisticsInputs, TeamConfig } from "../types/logistics";
 import { BREAK_HOURS_PER_SHIFT, computeLogistics } from "../lib/calculations";
 import type { LogisticsDerived } from "../types/logistics";
-import { loadDays, saveDays, todayISO, type DaysStore } from "../lib/storage";
+import { loadDays, nowDecimalHours, saveDays, todayISO, type DaysStore } from "../lib/storage";
 
 const DEFAULT_TEAMS: TeamConfig[] = [
   { id: "matin", label: "Équipe Matin", start: "05:00", end: "12:36", headcount: 0 },
@@ -85,7 +85,14 @@ export function LogisticsProvider({ children }: { children: ReactNode }) {
   }, [store]);
 
   const inputs = store[selectedDate] ?? DEFAULT_INPUTS;
-  const derived = useMemo(() => computeLogistics(inputs), [inputs]);
+  // Sur la journée en cours (date du jour réelle), on ne compte que les heures encore
+  // disponibles à partir de maintenant : ce que ça ne suffit pas à absorber devient un
+  // report sur demain (cf. lib/backlog.ts), exactement comme si on saisissait en direct
+  // à 14h avec seulement l'après-midi restant pour traiter la charge du jour.
+  const derived = useMemo(
+    () => computeLogistics(inputs, selectedDate === todayISO() ? nowDecimalHours() : null),
+    [inputs, selectedDate],
+  );
 
   const updateCurrent = (updater: (prev: LogisticsInputs) => LogisticsInputs) => {
     setStore((prev) => ({

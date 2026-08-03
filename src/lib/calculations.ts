@@ -23,6 +23,9 @@ export function teamDurationHours(start: string, end: string): number {
 export const BREAK_MINUTES_PER_SHIFT = 10 + 20;
 export const BREAK_HOURS_PER_SHIFT = BREAK_MINUTES_PER_SHIFT / 60;
 
+/** Heure de début conventionnelle de la journée logistique (silo + équipes). */
+export const DAY_WINDOW_START = 5;
+
 export const OCCUPANCY_THRESHOLDS = {
   warning: 80,
   critical: 100,
@@ -39,12 +42,33 @@ function safeDiv(a: number, b: number): number {
   return a / b;
 }
 
-export function computeLogistics(inputs: LogisticsInputs): LogisticsDerived {
+/**
+ * @param asOfHour Si renseigné (heure décimale, ex. 14.5 = 14h30), ne compte que la
+ *   capacité et la fenêtre silo *restantes* à partir de cette heure — utilisé quand on
+ *   saisit les données de la journée en cours d'après-midi : les heures déjà passées ne
+ *   sont plus disponibles, et le surplus se reporte sur le lendemain (cf. lib/backlog.ts).
+ *   Laisser à `null` pour un calcul plein jour (jours passés, futurs, ou planification).
+ */
+export function computeLogistics(
+  inputs: LogisticsInputs,
+  asOfHour: number | null = null,
+): LogisticsDerived {
   const teams: TeamDerived[] = inputs.teams.map((team) => {
     const grossDurationHours = teamDurationHours(team.start, team.end);
-    const durationHours = Math.max(0, grossDurationHours - BREAK_HOURS_PER_SHIFT);
+    const breakAdjustedDurationHours = Math.max(0, grossDurationHours - BREAK_HOURS_PER_SHIFT);
+
+    let durationHours = breakAdjustedDurationHours;
+    if (asOfHour !== null) {
+      const start = timeToHours(team.start);
+      const rawEnd = timeToHours(team.end);
+      const end = rawEnd > start ? rawEnd : rawEnd + 24;
+      const remainingGross = Math.max(0, end - Math.max(start, asOfHour));
+      const ratio = grossDurationHours > 0 ? remainingGross / grossDurationHours : 0;
+      durationHours = breakAdjustedDurationHours * ratio;
+    }
+
     const capacityHours = durationHours * Math.max(0, team.headcount);
-    return { ...team, grossDurationHours, durationHours, capacityHours };
+    return { ...team, grossDurationHours, breakAdjustedDurationHours, durationHours, capacityHours };
   });
 
   const totalPreparateurs = teams.reduce(
@@ -60,10 +84,15 @@ export function computeLogistics(inputs: LogisticsInputs): LogisticsDerived {
   // avec sa propre fenêtre de fonctionnement quotidienne (par défaut 2×7h36, mais peut
   // tourner davantage — 2×8h, 3×8h, samedi en plus...) : au-delà, le volume restant ne
   // peut pas sortir aujourd'hui et devient un report silo (géré jour après jour dans
-  // la vision multi-jours, cf. lib/backlog.ts).
+  // la vision multi-jours, cf. lib/backlog.ts). Si `asOfHour` est renseigné, on suppose le
+  // silo actif depuis `DAY_WINDOW_START` et on ne garde que la fenêtre restante.
   const siloEffectiveCadence = inputs.siloCadence * (Math.max(0, inputs.siloEfficiencyPct) / 100);
   const siloDowntimeHours = Math.max(0, inputs.siloDowntimeHours);
-  const siloWindowHours = Math.max(0, inputs.siloWindowHours);
+  const siloWindowHoursRaw = Math.max(0, inputs.siloWindowHours);
+  const siloWindowHours =
+    asOfHour === null
+      ? siloWindowHoursRaw
+      : Math.max(0, siloWindowHoursRaw - Math.max(0, asOfHour - DAY_WINDOW_START));
   const siloTimeHours = safeDiv(inputs.siloPalettes, siloEffectiveCadence) + siloDowntimeHours;
   const siloChargeHours = Math.min(siloTimeHours, siloWindowHours); // absorbable aujourd'hui
   const siloOverflowHours = Math.max(0, siloTimeHours - siloWindowHours); // à reporter

@@ -33,7 +33,10 @@ export type OccupancyStatus = "ok" | "warning" | "critical";
 export interface TeamDerived extends TeamConfig {
   /** Durée brute de l'équipe (horaire de prise/fin de poste), sans les pauses. */
   grossDurationHours: number;
-  /** Durée effective de travail, pauses déduites (10 + 20 min). */
+  /** Durée pauses déduites, plein jour (indépendante d'une éventuelle heure "à date"). */
+  breakAdjustedDurationHours: number;
+  /** Durée effective retenue pour la capacité : identique à `breakAdjustedDurationHours`
+   *  en mode plein jour, ou réduite au temps restant si un `asOfHour` a été fourni au calcul. */
   durationHours: number;
   capacityHours: number; // durationHours (effective) * headcount
 }

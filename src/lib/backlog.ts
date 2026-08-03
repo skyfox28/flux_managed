@@ -1,5 +1,5 @@
-import { computeLogistics, occupancyStatus } from "./calculations";
-import { addDaysISO, type DaysStore } from "./storage";
+import { computeLogistics, DAY_WINDOW_START, occupancyStatus } from "./calculations";
+import { addDaysISO, nowDecimalHours, todayISO, type DaysStore } from "./storage";
 import type { LogisticsInputs } from "../types/logistics";
 
 export interface DayForecast {
@@ -42,17 +42,24 @@ interface DayStep {
  *  - l'équipe humaine, contrainte par les préparateur-heures disponibles.
  * Le silo absorbe d'abord son report + son propre besoin dans sa fenêtre ; ce qui est
  * réellement sorti aujourd'hui mobilise ensuite un préparateur-équivalent, comme le
- * picking, pour former la charge humaine du jour.
+ * picking, pour former la charge humaine du jour. Pour la journée réelle en cours,
+ * `computeLogistics` est appelé avec l'heure actuelle : seules les heures encore
+ * disponibles (équipes + fenêtre silo) comptent, le reste part directement en report.
  */
 function applyDay(
   inputs: LogisticsInputs,
   humanBacklogIn: number,
   siloBacklogIn: number,
+  date: string,
 ): DayStep {
-  const own = computeLogistics(inputs);
+  const asOfHour = date === todayISO() ? nowDecimalHours() : null;
+  const own = computeLogistics(inputs, asOfHour);
 
   const siloNeedTotal = own.siloTimeHours + siloBacklogIn;
-  const siloWindowHours = Math.max(0, inputs.siloWindowHours);
+  const siloWindowHours =
+    asOfHour === null
+      ? Math.max(0, inputs.siloWindowHours)
+      : Math.max(0, inputs.siloWindowHours - Math.max(0, asOfHour - DAY_WINDOW_START));
   const siloChargeToday = Math.min(siloNeedTotal, siloWindowHours);
   const siloBacklogOut = Math.max(0, siloNeedTotal - siloWindowHours);
 
@@ -91,7 +98,7 @@ export function computeForecastChain(
   let humanBacklog = 0;
   let siloBacklog = 0;
   for (const d of precedingDates) {
-    const step = applyDay(store[d], humanBacklog, siloBacklog);
+    const step = applyDay(store[d], humanBacklog, siloBacklog, d);
     humanBacklog = step.humanBacklogOut;
     siloBacklog = step.siloBacklogOut;
   }
@@ -104,7 +111,7 @@ export function computeForecastChain(
     const inputs = store[date];
     if (!inputs) break; // jour non saisi -> on arrête, rien n'est inventé
 
-    const step = applyDay(inputs, humanBacklog, siloBacklog);
+    const step = applyDay(inputs, humanBacklog, siloBacklog, date);
 
     results.push({
       date,

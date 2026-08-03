@@ -7,6 +7,7 @@ import { SectionTitle } from "../ui/StatRow";
 import { useLogistics } from "../../state/LogisticsContext";
 import { computeForecastChain, type DayForecast } from "../../lib/backlog";
 import { computeFinishEstimate } from "../../lib/schedule";
+import { nowDecimalHours, todayISO } from "../../lib/storage";
 import { formatDayLabel, formatHoursMinutes, formatPercent } from "../../lib/format";
 
 const HORIZON_DAYS = 7;
@@ -19,7 +20,8 @@ const STATUS_STYLE: Record<string, { text: string; bar: string; ring: string }> 
 
 function DayCard({ day }: { day: DayForecast }) {
   const style = STATUS_STYLE[day.status];
-  const finish = computeFinishEstimate(day.own, day.totalCharge);
+  const asOfHour = day.date === todayISO() ? nowDecimalHours() : null;
+  const finish = computeFinishEstimate(day.own, day.totalCharge, asOfHour);
   const capacity = day.own.totalCapacityHours || 1;
   // Au-delà de la capacité, on normalise les deux segments sur le total à traiter
   // (au lieu de plafonner le report seul) pour que la sévérité (couleur du statut)

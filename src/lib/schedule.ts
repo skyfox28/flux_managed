@@ -19,7 +19,7 @@ export interface FinishEstimate {
   isLate: boolean;
 }
 
-function hoursToClockLabel(hours: number): string {
+export function hoursToClockLabel(hours: number): string {
   const wrapped = ((hours % 24) + 24) % 24;
   const h = Math.floor(wrapped);
   const m = Math.round((wrapped - h) * 60);
@@ -51,27 +51,34 @@ function result(
  * `overflows` passe à true et `overflowHours` indique de combien. Une fin après
  * `LATE_SHIPPING_HOUR` (17h) est aussi signalée via `isLate`, même sans débordement —
  * les chargements sont rares passé cette heure.
+ *
+ * @param asOfHour Si renseigné, le décompte ne démarre pas avant cette heure (les
+ *   heures déjà passées ne comptent plus) — utilisé pour la journée réelle en cours.
  */
 export function computeFinishEstimate(
   derived: LogisticsDerived,
   totalChargeHours: number = derived.totalChargeHours,
+  asOfHour: number | null = null,
 ): FinishEstimate {
   const segments = derived.teams
     .filter((t) => t.headcount > 0 && t.grossDurationHours > 0)
     .map((t) => {
-      const start = timeToHours(t.start);
+      const rawStart = timeToHours(t.start);
       const rawEnd = timeToHours(t.end);
-      const end = rawEnd > start ? rawEnd : rawEnd + 24;
-      const breakFactor = t.grossDurationHours > 0 ? t.durationHours / t.grossDurationHours : 0;
+      const end = rawEnd > rawStart ? rawEnd : rawEnd + 24;
+      const start = asOfHour !== null ? Math.max(rawStart, asOfHour) : rawStart;
+      const breakFactor =
+        t.grossDurationHours > 0 ? t.breakAdjustedDurationHours / t.grossDurationHours : 0;
       return { start, end, rate: t.headcount * breakFactor };
     })
+    .filter((s) => s.end > s.start)
     .sort((a, b) => a.start - b.start);
 
   const dayEnd = segments.length > 0 ? Math.max(...segments.map((s) => s.end)) : 20;
   const dayEndLabel = hoursToClockLabel(dayEnd);
 
   if (totalChargeHours <= 0) {
-    return result(segments[0]?.start ?? 5, false, 0, dayEndLabel);
+    return result(segments[0]?.start ?? asOfHour ?? 5, false, 0, dayEndLabel);
   }
   if (segments.length === 0) {
     return result(null, true, totalChargeHours, dayEndLabel);

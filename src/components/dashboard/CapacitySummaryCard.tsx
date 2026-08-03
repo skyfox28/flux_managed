@@ -3,18 +3,24 @@ import { GlassCard } from "../ui/GlassCard";
 import { SectionTitle, StatRow } from "../ui/StatRow";
 import { useLogistics } from "../../state/LogisticsContext";
 import { formatHoursMinutes, formatPercent } from "../../lib/format";
-import { computeFinishEstimate, LATE_SHIPPING_HOUR } from "../../lib/schedule";
+import { computeFinishEstimate, hoursToClockLabel, LATE_SHIPPING_HOUR } from "../../lib/schedule";
+import { nowDecimalHours, todayISO } from "../../lib/storage";
 
 export function CapacitySummaryCard() {
-  const { derived } = useLogistics();
-  const finish = computeFinishEstimate(derived);
+  const { derived, selectedDate } = useLogistics();
+  const asOfHour = selectedDate === todayISO() ? nowDecimalHours() : null;
+  const finish = computeFinishEstimate(derived, undefined, asOfHour);
 
   return (
     <GlassCard delay={0.2} glowColor={derived.status === "critical" ? "orange" : "cyan"}>
       <SectionTitle
         icon={<Gauge className="h-5 w-5" strokeWidth={2} />}
         title="Charge & capacité"
-        subtitle="Bilan préparateur-heures du jour"
+        subtitle={
+          asOfHour !== null
+            ? `Capacité restante à partir de ${hoursToClockLabel(asOfHour)}`
+            : "Bilan préparateur-heures du jour"
+        }
       />
       <StatRow label="Charge SILO" value={formatHoursMinutes(derived.siloChargeHours)} />
       <StatRow

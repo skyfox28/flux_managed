@@ -1,7 +1,15 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import type { LogisticsInputs, TeamConfig } from "../types/logistics";
 import { computeLogistics } from "../lib/calculations";
 import type { LogisticsDerived } from "../types/logistics";
+import { loadDays, saveDays, todayISO, type DaysStore } from "../lib/storage";
 
 const DEFAULT_TEAMS: TeamConfig[] = [
   { id: "matin", label: "Équipe Matin", start: "05:00", end: "12:36", headcount: 8 },
@@ -23,6 +31,10 @@ export const DEFAULT_INPUTS: LogisticsInputs = {
   teams: DEFAULT_TEAMS,
 };
 
+function cloneInputs(inputs: LogisticsInputs): LogisticsInputs {
+  return { ...inputs, teams: inputs.teams.map((t) => ({ ...t })) };
+}
+
 interface LogisticsContextValue {
   inputs: LogisticsInputs;
   derived: LogisticsDerived;
@@ -32,34 +44,85 @@ interface LogisticsContextValue {
   setPickingCadence: (v: number) => void;
   setTeamHeadcount: (id: TeamConfig["id"], headcount: number) => void;
   reset: () => void;
+  /** Journées enregistrées, triées chronologiquement, avec leur statut calculé. */
+  savedDays: { date: string; status: LogisticsDerived["status"] }[];
+  selectedDate: string;
+  selectDate: (date: string) => void;
+  deleteDay: (date: string) => void;
 }
 
 const LogisticsContext = createContext<LogisticsContextValue | null>(null);
 
 export function LogisticsProvider({ children }: { children: ReactNode }) {
-  const [inputs, setInputs] = useState<LogisticsInputs>(DEFAULT_INPUTS);
+  const [selectedDate, setSelectedDate] = useState<string>(() => todayISO());
+  const [store, setStore] = useState<DaysStore>(() => {
+    const loaded = loadDays();
+    const today = todayISO();
+    if (!loaded[today]) loaded[today] = cloneInputs(DEFAULT_INPUTS);
+    return loaded;
+  });
 
+  useEffect(() => {
+    saveDays(store);
+  }, [store]);
+
+  const inputs = store[selectedDate] ?? DEFAULT_INPUTS;
   const derived = useMemo(() => computeLogistics(inputs), [inputs]);
+
+  const updateCurrent = (updater: (prev: LogisticsInputs) => LogisticsInputs) => {
+    setStore((prev) => ({
+      ...prev,
+      [selectedDate]: updater(prev[selectedDate] ?? cloneInputs(DEFAULT_INPUTS)),
+    }));
+  };
+
+  const savedDays = useMemo(
+    () =>
+      Object.keys(store)
+        .sort()
+        .map((date) => ({ date, status: computeLogistics(store[date]).status })),
+    [store],
+  );
 
   const value: LogisticsContextValue = {
     inputs,
     derived,
-    setSiloPalettes: (v) =>
-      setInputs((prev) => ({ ...prev, siloPalettes: Math.max(0, v) })),
-    setSiloCadence: (v) =>
-      setInputs((prev) => ({ ...prev, siloCadence: Math.max(0, v) })),
-    setPickingColis: (v) =>
-      setInputs((prev) => ({ ...prev, pickingColis: Math.max(0, v) })),
+    setSiloPalettes: (v) => updateCurrent((prev) => ({ ...prev, siloPalettes: Math.max(0, v) })),
+    setSiloCadence: (v) => updateCurrent((prev) => ({ ...prev, siloCadence: Math.max(0, v) })),
+    setPickingColis: (v) => updateCurrent((prev) => ({ ...prev, pickingColis: Math.max(0, v) })),
     setPickingCadence: (v) =>
-      setInputs((prev) => ({ ...prev, pickingCadence: Math.max(0, v) })),
+      updateCurrent((prev) => ({ ...prev, pickingCadence: Math.max(0, v) })),
     setTeamHeadcount: (id, headcount) =>
-      setInputs((prev) => ({
+      updateCurrent((prev) => ({
         ...prev,
         teams: prev.teams.map((t) =>
           t.id === id ? { ...t, headcount: Math.max(0, headcount) } : t,
         ),
       })),
-    reset: () => setInputs(DEFAULT_INPUTS),
+    reset: () => updateCurrent(() => cloneInputs(DEFAULT_INPUTS)),
+    savedDays,
+    selectedDate,
+    selectDate: (date) => {
+      setStore((prev) => {
+        if (prev[date]) return prev;
+        // Nouvelle journée : on part de la saisie courante (cadences/effectifs
+        // restent généralement stables d'un jour à l'autre, seuls les volumes changent).
+        return { ...prev, [date]: cloneInputs(inputs) };
+      });
+      setSelectedDate(date);
+    },
+    deleteDay: (date) => {
+      setStore((prev) => {
+        if (Object.keys(prev).length <= 1) return prev; // toujours garder au moins un jour
+        const next = { ...prev };
+        delete next[date];
+        if (date === selectedDate) {
+          const remaining = Object.keys(next).sort();
+          setSelectedDate(remaining[remaining.length - 1]);
+        }
+        return next;
+      });
+    },
   };
 
   return (

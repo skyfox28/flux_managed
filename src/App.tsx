@@ -1,5 +1,6 @@
 import { LogisticsProvider } from "./state/LogisticsContext";
 import { Header } from "./components/layout/Header";
+import { DayBar } from "./components/dashboard/DayBar";
 import { AlertBanner } from "./components/dashboard/AlertBanner";
 import { GaugePanel } from "./components/dashboard/GaugePanel";
 import { FlowScenePanel } from "./components/dashboard/FlowScenePanel";
@@ -20,6 +21,7 @@ function App() {
       <div className="app-grid" />
       <div className="relative z-10 mx-auto flex min-h-screen max-w-[1600px] flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
         <Header />
+        <DayBar />
         <AlertBanner />
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[340px_1fr]">

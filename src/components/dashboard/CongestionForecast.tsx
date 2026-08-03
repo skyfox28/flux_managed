@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { ArrowDown, ArrowRight, Snowflake } from "lucide-react";
+import { ArrowDown, ArrowRight, CalendarPlus, Snowflake } from "lucide-react";
 import clsx from "clsx";
 import { GlassCard } from "../ui/GlassCard";
 import { SectionTitle } from "../ui/StatRow";
 import { useLogistics } from "../../state/LogisticsContext";
-import { computeForecastChain, type DayForecast } from "../../lib/backlog";
+import { computeForecastChain, type DayForecast, type PendingDay } from "../../lib/backlog";
 import { formatDayLabel, formatHoursMinutes, formatPercent } from "../../lib/format";
 
 const STATUS_STYLE: Record<string, { text: string; bar: string; ring: string }> = {
@@ -34,11 +34,9 @@ function DayColumn({ day }: { day: DayForecast }) {
         <span className="font-display text-sm font-semibold capitalize text-slate-100">
           {formatDayLabel(day.date)}
         </span>
-        {day.projected && (
-          <span className="rounded-full border border-dashed border-white/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-slate-500">
-            Projeté
-          </span>
-        )}
+        <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-slate-500">
+          Saisi
+        </span>
       </div>
 
       <div className="mb-1 h-2.5 w-full overflow-hidden rounded-full bg-white/5">
@@ -111,17 +109,39 @@ function DayColumn({ day }: { day: DayForecast }) {
   );
 }
 
+function PendingColumn({ day }: { day: PendingDay }) {
+  const { selectDate } = useLogistics();
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/[0.015] p-3.5 text-center">
+      <span className="font-display text-sm font-semibold capitalize text-slate-400">
+        {formatDayLabel(day.date)}
+      </span>
+      <span className="text-[11px] text-slate-600">Journée non saisie</span>
+      {day.backlogIn !== null && day.backlogIn > 0 && (
+        <span className="rounded-full bg-orange-400/10 px-2 py-1 text-[11px] font-medium text-orange-300">
+          {formatHoursMinutes(day.backlogIn)} en attente
+        </span>
+      )}
+      <button
+        onClick={() => selectDate(day.date)}
+        className="mt-1 flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-slate-400 transition-colors hover:border-cyan-300/30 hover:text-cyan-300"
+      >
+        <CalendarPlus className="h-3.5 w-3.5" />
+        Saisir ce jour
+      </button>
+    </div>
+  );
+}
+
 export function CongestionForecast() {
   const { store, selectedDate } = useLogistics();
-  const chain = useMemo(
+  const { days, pending } = useMemo(
     () => computeForecastChain(store, selectedDate, 3),
     [store, selectedDate],
   );
 
-  if (chain.length === 0) return null;
-
-  const finalBacklog = chain[chain.length - 1].backlogOut;
-  const isSnowballing = chain.some((d) => d.congested);
+  const lastKnown = days[days.length - 1];
+  const isSnowballing = Boolean(lastKnown?.congested);
 
   return (
     <GlassCard delay={0.15} className="col-span-full" glowColor={isSnowballing ? "orange" : "cyan"}>
@@ -129,7 +149,7 @@ export function CongestionForecast() {
         <SectionTitle
           icon={<Snowflake className="h-5 w-5" strokeWidth={2} />}
           title="Vision 72h · effet boule de neige"
-          subtitle="Report de la charge non absorbée, jour après jour"
+          subtitle="Report de la charge non absorbée, jour après jour saisi"
         />
         <span
           className={clsx(
@@ -140,8 +160,8 @@ export function CongestionForecast() {
           )}
         >
           {isSnowballing
-            ? `Congestion prévue — ${formatHoursMinutes(finalBacklog)} non absorbées sous 72h`
-            : "Aucune accumulation prévue sur 72h"}
+            ? `Congestion — ${formatHoursMinutes(lastKnown.backlogOut)} non absorbées après le ${formatDayLabel(lastKnown.date)}`
+            : "Aucune accumulation sur les jours saisis"}
         </span>
       </div>
 
@@ -151,16 +171,27 @@ export function CongestionForecast() {
         transition={{ duration: 0.4 }}
         className="mt-3 flex flex-col items-stretch gap-2 md:flex-row md:items-center"
       >
-        {chain.map((day, i) => (
+        {days.map((day, i) => (
           <div key={day.date} className="flex flex-1 flex-col items-center gap-2 md:flex-row">
             <DayColumn day={day} />
-            {i < chain.length - 1 && (
+            {(i < days.length - 1 || pending.length > 0) && (
               <div
                 className={clsx(
                   "flex shrink-0 items-center justify-center",
                   day.congested ? "text-rose-400" : "text-slate-700",
                 )}
               >
+                <ArrowDown className="h-4 w-4 md:hidden" />
+                <ArrowRight className="hidden h-4 w-4 md:block" />
+              </div>
+            )}
+          </div>
+        ))}
+        {pending.map((day, i) => (
+          <div key={day.date} className="flex flex-1 flex-col items-center gap-2 md:flex-row">
+            <PendingColumn day={day} />
+            {i < pending.length - 1 && (
+              <div className="flex shrink-0 items-center justify-center text-slate-700">
                 <ArrowDown className="h-4 w-4 md:hidden" />
                 <ArrowRight className="hidden h-4 w-4 md:block" />
               </div>

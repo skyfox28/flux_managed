@@ -1,12 +1,9 @@
-import type { LogisticsDerived, LogisticsInputs } from "../types/logistics";
 import { computeLogistics, occupancyStatus } from "./calculations";
 import { addDaysISO, type DaysStore } from "./storage";
 
 export interface DayForecast {
   date: string;
-  /** La journée a-t-elle une saisie réelle, ou est-elle projetée depuis la dernière saisie connue ? */
-  projected: boolean;
-  own: LogisticsDerived;
+  own: ReturnType<typeof computeLogistics>;
   /** Report reçu de la veille (préparateur-heures non absorbées). */
   backlogIn: number;
   /** Charge propre du jour + report reçu. */
@@ -15,21 +12,35 @@ export interface DayForecast {
   occupancyWithBacklog: number;
   /** Part non absorbée aujourd'hui, reportée au lendemain. */
   backlogOut: number;
-  status: LogisticsDerived["status"];
+  status: ReturnType<typeof occupancyStatus>;
   congested: boolean;
+}
+
+export interface PendingDay {
+  date: string;
+  /** Report qui attendra ce jour dès qu'il sera saisi (uniquement pour le tout
+   *  premier jour non saisi, immédiatement après la chaîne connue). */
+  backlogIn: number | null;
+}
+
+export interface ForecastResult {
+  /** Jours réellement saisis, chaînés consécutivement depuis `startDate`. */
+  days: DayForecast[];
+  /** Jours suivants non saisis dans l'horizon demandé — aucune donnée inventée. */
+  pending: PendingDay[];
 }
 
 /**
  * Calcule la chaîne de report de charge (effet boule de neige) sur `horizonDays`
- * jours à partir de `startDate`. Les jours sans saisie réelle dans `store` sont
- * projetés à partir de la dernière journée saisie (hypothèse : même volume tant
- * que rien n'est renseigné).
+ * jours à partir de `startDate`. Seuls les jours réellement saisis dans `store`
+ * sont calculés ; dès qu'un jour n'a pas de saisie, la chaîne s'arrête (aucune
+ * donnée n'est inventée pour les jours suivants).
  */
 export function computeForecastChain(
   store: DaysStore,
   startDate: string,
   horizonDays: number,
-): DayForecast[] {
+): ForecastResult {
   // 1. Reconstituer le report entrant du jour de départ en remontant la chaîne
   //    contiguë de journées déjà saisies avant startDate.
   const precedingDates: string[] = [];
@@ -49,28 +60,32 @@ export function computeForecastChain(
     backlog = Math.max(0, total - own.totalCapacityHours);
   }
 
-  // 2. Construire l'horizon demandé, en projetant les jours non saisis à partir
-  //    de la dernière saisie réelle rencontrée (celle du jour de départ au minimum).
-  const results: DayForecast[] = [];
+  // 2. Avancer jour par jour sur l'horizon demandé, en s'arrêtant de calculer
+  //    dès qu'un jour n'a pas de saisie réelle.
+  const days: DayForecast[] = [];
+  const pending: PendingDay[] = [];
   let date = startDate;
-  let lastKnownInputs: LogisticsInputs | undefined = store[startDate];
+  let chainBroken = false;
 
   for (let i = 0; i < horizonDays; i++) {
     const real = store[date];
-    const inputs = real ?? lastKnownInputs;
-    if (!inputs) break;
-    if (real) lastKnownInputs = real;
 
-    const own = computeLogistics(inputs);
+    if (!real || chainBroken) {
+      pending.push({ date, backlogIn: chainBroken ? null : backlog });
+      chainBroken = true;
+      date = addDaysISO(date, 1);
+      continue;
+    }
+
+    const own = computeLogistics(real);
     const backlogIn = backlog;
     const totalCharge = own.totalChargeHours + backlogIn;
     const backlogOut = Math.max(0, totalCharge - own.totalCapacityHours);
     const occupancyWithBacklog =
       own.totalCapacityHours > 0 ? (totalCharge / own.totalCapacityHours) * 100 : 0;
 
-    results.push({
+    days.push({
       date,
-      projected: !real,
       own,
       backlogIn,
       totalCharge,
@@ -84,5 +99,5 @@ export function computeForecastChain(
     date = addDaysISO(date, 1);
   }
 
-  return results;
+  return { days, pending };
 }

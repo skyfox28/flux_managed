@@ -17,6 +17,10 @@ export interface LogisticsInputs {
   siloEfficiencyPct: number;
   /** Panne(s) magasin automatique : heures d'arrêt du silo ce jour-là. */
   siloDowntimeHours: number;
+  /** Fenêtre de fonctionnement du silo (magasin automatique) ce jour-là, en heures.
+   *  Par défaut 2×7h36 (équipes matin + après-midi), mais peut être étendu
+   *  (2×8h, 3×8h, 3×7h36, samedi supplémentaire...). */
+  siloWindowHours: number;
   pickingColis: number;
   pickingCadence: number; // colis / heure / préparateur (nominale)
   /** Efficacité réelle vs cadence nominale (aléas humains/machine) : 100 = nominal. */
@@ -39,8 +43,14 @@ export interface LogisticsDerived {
   teams: TeamDerived[];
 
   siloEffectiveCadence: number; // cadence nominale × efficacité
-  siloTimeHours: number; // palettes / cadence effective + arrêt silo
-  siloChargeHours: number; // person-hours mobilized by SILO
+  /** Temps brut nécessaire pour sortir tout le volume du jour (palettes/cadence + panne),
+   *  indépendamment de la fenêtre de fonctionnement du silo. */
+  siloTimeHours: number;
+  /** Part de ce temps réellement absorbable aujourd'hui, plafonnée à `siloWindowHours`. */
+  siloChargeHours: number;
+  /** Part du besoin du jour qui dépasse la fenêtre silo — à reporter (hors report déjà
+   *  reçu d'un jour précédent, qui est géré séparément dans la vision multi-jours). */
+  siloOverflowHours: number;
 
   pickingEffectiveCadence: number; // cadence nominale × efficacité
   pickingTimeHours: number; // colis / (cadence effective × totalPrepa) — durée si tous en picking

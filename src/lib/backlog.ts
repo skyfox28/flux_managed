@@ -1,48 +1,89 @@
 import { computeLogistics, occupancyStatus } from "./calculations";
+import { predictDay, type PredictionConfidence } from "./prediction";
 import { addDaysISO, type DaysStore } from "./storage";
+import type { LogisticsInputs } from "../types/logistics";
 
 export interface DayForecast {
   date: string;
+  /** "real" = saisi par l'utilisateur, "predicted" = estimé par l'algorithme de prévision. */
+  source: "real" | "predicted";
+  confidence?: PredictionConfidence;
   own: ReturnType<typeof computeLogistics>;
-  /** Report reçu de la veille (préparateur-heures non absorbées). */
+
+  /** Report humain (préparateur-heures) reçu de la veille. */
   backlogIn: number;
-  /** Charge propre du jour + report reçu. */
+  /** Charge humaine totale du jour (silo absorbé + picking + report humain reçu). */
   totalCharge: number;
-  /** Taux d'occupation en tenant compte du report. */
+  /** Taux d'occupation humaine en tenant compte du report. */
   occupancyWithBacklog: number;
-  /** Part non absorbée aujourd'hui, reportée au lendemain. */
+  /** Part de charge humaine non absorbée aujourd'hui, reportée au lendemain. */
   backlogOut: number;
   status: ReturnType<typeof occupancyStatus>;
   congested: boolean;
+
+  /** Report silo (heures de fonctionnement en attente) reçu de la veille. */
+  siloBacklogIn: number;
+  /** Part du besoin silo (propre + report) réellement absorbée aujourd'hui, dans la fenêtre. */
+  siloChargeToday: number;
+  /** Part du besoin silo qui dépasse encore la fenêtre du jour, reportée au lendemain. */
+  siloBacklogOut: number;
+  siloCongested: boolean;
 }
 
-export interface PendingDay {
-  date: string;
-  /** Report qui attendra ce jour dès qu'il sera saisi (uniquement pour le tout
-   *  premier jour non saisi, immédiatement après la chaîne connue). */
-  backlogIn: number | null;
+interface DayStep {
+  own: ReturnType<typeof computeLogistics>;
+  siloChargeToday: number;
+  siloBacklogOut: number;
+  totalChargeToday: number;
+  humanBacklogOut: number;
+  occupancyWithBacklog: number;
 }
 
-export interface ForecastResult {
-  /** Jours réellement saisis, chaînés consécutivement depuis `startDate`. */
-  days: DayForecast[];
-  /** Jours suivants non saisis dans l'horizon demandé — aucune donnée inventée. */
-  pending: PendingDay[];
+/**
+ * Applique un jour de charge à deux files de report indépendantes :
+ *  - le silo, contraint par sa propre fenêtre de fonctionnement quotidienne
+ *    (`inputs.siloWindowHours` — 2×7h36 par défaut, mais réglable) ;
+ *  - l'équipe humaine, contrainte par les préparateur-heures disponibles.
+ * Le silo absorbe d'abord son report + son propre besoin dans sa fenêtre ; ce qui est
+ * réellement sorti aujourd'hui mobilise ensuite un préparateur-équivalent, comme le
+ * picking, pour former la charge humaine du jour.
+ */
+function applyDay(
+  inputs: LogisticsInputs,
+  humanBacklogIn: number,
+  siloBacklogIn: number,
+): DayStep {
+  const own = computeLogistics(inputs);
+
+  const siloNeedTotal = own.siloTimeHours + siloBacklogIn;
+  const siloWindowHours = Math.max(0, inputs.siloWindowHours);
+  const siloChargeToday = Math.min(siloNeedTotal, siloWindowHours);
+  const siloBacklogOut = Math.max(0, siloNeedTotal - siloWindowHours);
+
+  const totalChargeToday = siloChargeToday + own.pickingChargeHours + humanBacklogIn;
+  const humanBacklogOut = Math.max(0, totalChargeToday - own.totalCapacityHours);
+  const occupancyWithBacklog =
+    own.totalCapacityHours > 0 ? (totalChargeToday / own.totalCapacityHours) * 100 : 0;
+
+  return { own, siloChargeToday, siloBacklogOut, totalChargeToday, humanBacklogOut, occupancyWithBacklog };
 }
 
 /**
  * Calcule la chaîne de report de charge (effet boule de neige) sur `horizonDays`
- * jours à partir de `startDate`. Seuls les jours réellement saisis dans `store`
- * sont calculés ; dès qu'un jour n'a pas de saisie, la chaîne s'arrête (aucune
- * donnée n'est inventée pour les jours suivants).
+ * jours à partir de `startDate`, avec deux files indépendantes (silo / humain).
+ * Les jours réellement saisis utilisent la saisie ; les jours suivants non saisis
+ * sont estimés par `predictDay` (moyenne pondérée par récence + tendance +
+ * saisonnalité, à partir de l'historique réel uniquement) et clairement distingués
+ * via `source: "predicted"`. Si aucun historique n'existe encore, la chaîne s'arrête
+ * plutôt que d'inventer une donnée sans base.
  */
 export function computeForecastChain(
   store: DaysStore,
   startDate: string,
   horizonDays: number,
-): ForecastResult {
-  // 1. Reconstituer le report entrant du jour de départ en remontant la chaîne
-  //    contiguë de journées déjà saisies avant startDate.
+): DayForecast[] {
+  // 1. Reconstituer les deux reports entrants du jour de départ en remontant la
+  //    chaîne contiguë de journées déjà saisies avant startDate.
   const precedingDates: string[] = [];
   let cursor = startDate;
   while (true) {
@@ -53,51 +94,58 @@ export function computeForecastChain(
     } else break;
   }
 
-  let backlog = 0;
+  let humanBacklog = 0;
+  let siloBacklog = 0;
   for (const d of precedingDates) {
-    const own = computeLogistics(store[d]);
-    const total = own.totalChargeHours + backlog;
-    backlog = Math.max(0, total - own.totalCapacityHours);
+    const step = applyDay(store[d], humanBacklog, siloBacklog);
+    humanBacklog = step.humanBacklogOut;
+    siloBacklog = step.siloBacklogOut;
   }
 
-  // 2. Avancer jour par jour sur l'horizon demandé, en s'arrêtant de calculer
-  //    dès qu'un jour n'a pas de saisie réelle.
-  const days: DayForecast[] = [];
-  const pending: PendingDay[] = [];
+  // 2. Avancer jour par jour sur l'horizon demandé.
+  const results: DayForecast[] = [];
   let date = startDate;
-  let chainBroken = false;
 
   for (let i = 0; i < horizonDays; i++) {
     const real = store[date];
+    let source: DayForecast["source"];
+    let confidence: PredictionConfidence | undefined;
+    let inputs: LogisticsInputs;
 
-    if (!real || chainBroken) {
-      pending.push({ date, backlogIn: chainBroken ? null : backlog });
-      chainBroken = true;
-      date = addDaysISO(date, 1);
-      continue;
+    if (real) {
+      source = "real";
+      inputs = real;
+    } else {
+      const prediction = predictDay(store, date);
+      if (!prediction) break; // pas d'historique du tout -> rien de fiable à afficher
+      source = "predicted";
+      confidence = prediction.confidence;
+      inputs = prediction.inputs;
     }
 
-    const own = computeLogistics(real);
-    const backlogIn = backlog;
-    const totalCharge = own.totalChargeHours + backlogIn;
-    const backlogOut = Math.max(0, totalCharge - own.totalCapacityHours);
-    const occupancyWithBacklog =
-      own.totalCapacityHours > 0 ? (totalCharge / own.totalCapacityHours) * 100 : 0;
+    const step = applyDay(inputs, humanBacklog, siloBacklog);
 
-    days.push({
+    results.push({
       date,
-      own,
-      backlogIn,
-      totalCharge,
-      occupancyWithBacklog,
-      backlogOut,
-      status: occupancyStatus(occupancyWithBacklog),
-      congested: backlogOut > 0,
+      source,
+      confidence,
+      own: step.own,
+      backlogIn: humanBacklog,
+      totalCharge: step.totalChargeToday,
+      occupancyWithBacklog: step.occupancyWithBacklog,
+      backlogOut: step.humanBacklogOut,
+      status: occupancyStatus(step.occupancyWithBacklog),
+      congested: step.humanBacklogOut > 0,
+      siloBacklogIn: siloBacklog,
+      siloChargeToday: step.siloChargeToday,
+      siloBacklogOut: step.siloBacklogOut,
+      siloCongested: step.siloBacklogOut > 0,
     });
 
-    backlog = backlogOut;
+    humanBacklog = step.humanBacklogOut;
+    siloBacklog = step.siloBacklogOut;
     date = addDaysISO(date, 1);
   }
 
-  return { days, pending };
+  return results;
 }

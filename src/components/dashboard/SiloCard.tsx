@@ -36,14 +36,25 @@ export function SiloCard() {
         />
       )}
       <StatRow
-        label="Temps estimé"
+        label="Fenêtre silo (fonctionnement/j)"
+        value={formatHoursMinutes(inputs.siloWindowHours)}
+      />
+      <StatRow
+        label="Temps nécessaire (brut)"
         value={formatHoursMinutes(derived.siloTimeHours)}
         accent
       />
       <StatRow
-        label="Charge (préparateur-h)"
+        label="Absorbé aujourd'hui"
         value={formatHoursMinutes(derived.siloChargeHours)}
       />
+      {derived.siloOverflowHours > 0 && (
+        <StatRow
+          label="Hors fenêtre (à reporter)"
+          value={`+${formatHoursMinutes(derived.siloOverflowHours)}`}
+          tone="critical"
+        />
+      )}
     </GlassCard>
   );
 }

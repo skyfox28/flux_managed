@@ -56,11 +56,17 @@ export function computeLogistics(inputs: LogisticsInputs): LogisticsDerived {
   // SILO : temps de sortie du magasin automatique (ressource dédiée), indépendant des
   // effectifs picking. La cadence nominale est modulée par l'efficacité réelle (aléas
   // humains/machine : pics au-dessus ou en-dessous de la cadence de référence), et un
-  // arrêt silo (panne) s'ajoute directement au temps nécessaire.
+  // arrêt silo (panne) s'ajoute directement au temps nécessaire. Le silo est une machine
+  // avec sa propre fenêtre de fonctionnement quotidienne (par défaut 2×7h36, mais peut
+  // tourner davantage — 2×8h, 3×8h, samedi en plus...) : au-delà, le volume restant ne
+  // peut pas sortir aujourd'hui et devient un report silo (géré jour après jour dans
+  // la vision multi-jours, cf. lib/backlog.ts).
   const siloEffectiveCadence = inputs.siloCadence * (Math.max(0, inputs.siloEfficiencyPct) / 100);
   const siloDowntimeHours = Math.max(0, inputs.siloDowntimeHours);
+  const siloWindowHours = Math.max(0, inputs.siloWindowHours);
   const siloTimeHours = safeDiv(inputs.siloPalettes, siloEffectiveCadence) + siloDowntimeHours;
-  const siloChargeHours = siloTimeHours; // mobilise l'équivalent d'1 préparateur pendant ce temps
+  const siloChargeHours = Math.min(siloTimeHours, siloWindowHours); // absorbable aujourd'hui
+  const siloOverflowHours = Math.max(0, siloTimeHours - siloWindowHours); // à reporter
 
   // Picking : la cadence (par préparateur) est également modulée par l'efficacité réelle.
   const pickingEffectiveCadence =
@@ -82,6 +88,7 @@ export function computeLogistics(inputs: LogisticsInputs): LogisticsDerived {
     siloEffectiveCadence,
     siloTimeHours,
     siloChargeHours,
+    siloOverflowHours,
     pickingEffectiveCadence,
     pickingTimeHours,
     pickingChargeHours,

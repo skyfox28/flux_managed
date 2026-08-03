@@ -25,6 +25,7 @@ function normalizeInputs(inputs: Partial<LogisticsInputs>): LogisticsInputs {
     siloCadence: inputs.siloCadence ?? 18,
     siloEfficiencyPct: inputs.siloEfficiencyPct ?? 100,
     siloDowntimeHours: inputs.siloDowntimeHours ?? 0,
+    siloWindowHours: inputs.siloWindowHours ?? 2 * 7.6,
     pickingColis: inputs.pickingColis ?? 0,
     pickingCadence: inputs.pickingCadence ?? 400,
     pickingEfficiencyPct: inputs.pickingEfficiencyPct ?? 100,

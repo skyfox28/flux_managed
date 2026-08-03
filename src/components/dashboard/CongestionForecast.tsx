@@ -1,167 +1,165 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { ArrowDown, ArrowRight, CalendarPlus, Snowflake } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Boxes, Pencil, Sparkles, Snowflake } from "lucide-react";
 import clsx from "clsx";
 import { GlassCard } from "../ui/GlassCard";
 import { SectionTitle } from "../ui/StatRow";
 import { useLogistics } from "../../state/LogisticsContext";
-import { computeForecastChain, type DayForecast, type PendingDay } from "../../lib/backlog";
+import { computeForecastChain, type DayForecast } from "../../lib/backlog";
 import { formatDayLabel, formatHoursMinutes, formatPercent } from "../../lib/format";
 
+const HORIZON_DAYS = 7;
+
 const STATUS_STYLE: Record<string, { text: string; bar: string; ring: string }> = {
-  ok: { text: "text-emerald-300", bar: "bg-emerald-400", ring: "ring-emerald-400/20" },
-  warning: { text: "text-orange-300", bar: "bg-orange-400", ring: "ring-orange-400/20" },
-  critical: { text: "text-rose-300", bar: "bg-rose-400", ring: "ring-rose-400/20" },
+  ok: { text: "text-emerald-300", bar: "bg-emerald-400", ring: "ring-emerald-400/15" },
+  warning: { text: "text-orange-300", bar: "bg-orange-400", ring: "ring-orange-400/15" },
+  critical: { text: "text-rose-300", bar: "bg-rose-400", ring: "ring-rose-400/15" },
 };
 
-function DayColumn({ day }: { day: DayForecast }) {
+const CONFIDENCE_LABEL: Record<string, string> = {
+  low: "confiance faible",
+  medium: "confiance moyenne",
+  high: "confiance haute",
+};
+
+function DayCard({ day }: { day: DayForecast }) {
+  const { selectDate } = useLogistics();
+  const predicted = day.source === "predicted";
   const style = STATUS_STYLE[day.status];
   const capacity = day.own.totalCapacityHours || 1;
   // Au-delà de la capacité, on normalise les deux segments sur le total à traiter
-  // (au lieu de plafonner le report seul) pour que la composition reste lisible
-  // et que la sévérité (couleur du statut) ne soit jamais masquée par le report.
+  // (au lieu de plafonner le report seul) pour que la sévérité (couleur du statut)
+  // ne soit jamais masquée par le report.
   const denom = Math.max(capacity, day.totalCharge) || 1;
   const backlogPct = (day.backlogIn / denom) * 100;
   const ownPct = (day.own.totalChargeHours / denom) * 100;
-  const overflowPct = Math.max(
-    0,
-    ((day.totalCharge - day.own.totalCapacityHours) / capacity) * 100,
-  );
 
   return (
-    <div className={clsx("flex-1 rounded-xl border border-white/8 bg-white/[0.03] p-3.5 ring-1", style.ring)}>
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-display text-sm font-semibold capitalize text-slate-100">
+    <div
+      className={clsx(
+        "group relative flex w-[140px] shrink-0 flex-col gap-1.5 rounded-xl border bg-white/[0.03] p-2.5 ring-1",
+        predicted ? "border-dashed border-white/12" : "border-white/8",
+        style.ring,
+      )}
+      title={
+        predicted
+          ? `Prédiction (${CONFIDENCE_LABEL[day.confidence ?? "low"]}) · ${formatPercent(day.occupancyWithBacklog)} si ~${Math.round(day.own.totalChargeHours)}h de charge`
+          : `Charge propre ${formatHoursMinutes(day.own.totalChargeHours)} · Capacité ${formatHoursMinutes(day.own.totalCapacityHours)}`
+      }
+    >
+      <div className="flex items-center justify-between">
+        <span
+          className={clsx(
+            "font-display text-xs font-semibold capitalize",
+            predicted ? "text-slate-400" : "text-slate-100",
+          )}
+        >
           {formatDayLabel(day.date)}
         </span>
-        <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-slate-500">
-          Saisi
-        </span>
+        {predicted ? (
+          <Sparkles className="h-3 w-3 text-cyan-400/70" />
+        ) : (
+          <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
+        )}
       </div>
 
-      <div className="mb-1 h-2.5 w-full overflow-hidden rounded-full bg-white/5">
-        <div className="flex h-full w-full">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+        <div className={clsx("flex h-full w-full", predicted && "opacity-60")}>
           {backlogPct > 0 && (
             <div className="h-full bg-orange-400/80" style={{ width: `${backlogPct}%` }} />
           )}
           <div className={`h-full ${style.bar}`} style={{ width: `${Math.max(0, ownPct)}%` }} />
         </div>
       </div>
-      {overflowPct > 0 && (
-        <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-rose-500/10">
-          <div
-            className="h-full animate-pulse bg-rose-500"
-            style={{ width: `${Math.min(100, overflowPct)}%` }}
-          />
-        </div>
-      )}
-
-      <dl className="space-y-1 text-xs">
-        <div className="flex justify-between">
-          <dt className="text-slate-500">Charge propre</dt>
-          <dd className="tabular-nums text-slate-300">
-            {formatHoursMinutes(day.own.totalChargeHours)}
-          </dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-slate-500">Report reçu</dt>
-          <dd
-            className={clsx(
-              "tabular-nums",
-              day.backlogIn > 0 ? "font-semibold text-orange-300" : "text-slate-600",
-            )}
-          >
-            {day.backlogIn > 0 ? formatHoursMinutes(day.backlogIn) : "—"}
-          </dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-slate-500">Capacité</dt>
-          <dd className="tabular-nums text-slate-300">
-            {formatHoursMinutes(day.own.totalCapacityHours)}
-          </dd>
-        </div>
-        <div className="flex justify-between border-t border-white/5 pt-1">
-          <dt className="text-slate-400">Occupation</dt>
-          <dd className={clsx("font-display font-semibold tabular-nums", style.text)}>
-            {formatPercent(day.occupancyWithBacklog)}
-          </dd>
-        </div>
-      </dl>
 
       <div
         className={clsx(
-          "mt-2.5 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px]",
-          day.congested
-            ? "bg-rose-500/10 text-rose-300"
-            : "bg-emerald-500/10 text-emerald-300",
+          "font-display text-lg font-bold tabular-nums",
+          predicted ? "text-slate-300" : style.text,
         )}
       >
+        {formatPercent(day.occupancyWithBacklog)}
+      </div>
+
+      <div className="flex flex-col gap-1">
+        {day.backlogIn > 0 && (
+          <span className="flex items-center gap-1 text-[10px] font-medium text-orange-300">
+            <ArrowDownRight className="h-3 w-3 shrink-0" />
+            {formatHoursMinutes(day.backlogIn)} reçu
+          </span>
+        )}
         {day.congested ? (
-          <>
-            <ArrowRight className="h-3 w-3 shrink-0" />
-            Reporte {formatHoursMinutes(day.backlogOut)} au lendemain
-          </>
+          <span className="flex items-center gap-1 text-[10px] font-medium text-rose-300">
+            <ArrowUpRight className="h-3 w-3 shrink-0" />
+            {formatHoursMinutes(day.backlogOut)} reporté
+          </span>
         ) : (
-          "Rien à reporter"
+          <span className="text-[10px] text-emerald-400/80">Rien à reporter</span>
+        )}
+        {day.siloCongested && (
+          <span className="flex items-center gap-1 text-[10px] font-medium text-sky-300">
+            <Boxes className="h-3 w-3 shrink-0" />
+            {formatHoursMinutes(day.siloBacklogOut)} silo en attente
+          </span>
         )}
       </div>
-    </div>
-  );
-}
 
-function PendingColumn({ day }: { day: PendingDay }) {
-  const { selectDate } = useLogistics();
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/[0.015] p-3.5 text-center">
-      <span className="font-display text-sm font-semibold capitalize text-slate-400">
-        {formatDayLabel(day.date)}
-      </span>
-      <span className="text-[11px] text-slate-600">Journée non saisie</span>
-      {day.backlogIn !== null && day.backlogIn > 0 && (
-        <span className="rounded-full bg-orange-400/10 px-2 py-1 text-[11px] font-medium text-orange-300">
-          {formatHoursMinutes(day.backlogIn)} en attente
+      {predicted ? (
+        <button
+          onClick={() => selectDate(day.date)}
+          className="mt-0.5 flex items-center justify-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[10px] text-slate-500 transition-colors hover:border-cyan-300/30 hover:text-cyan-300"
+        >
+          <Pencil className="h-2.5 w-2.5" />
+          Prédit · {CONFIDENCE_LABEL[day.confidence ?? "low"]}
+        </button>
+      ) : (
+        <span className="mt-0.5 text-center text-[10px] uppercase tracking-wide text-slate-600">
+          Saisi
         </span>
       )}
-      <button
-        onClick={() => selectDate(day.date)}
-        className="mt-1 flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-slate-400 transition-colors hover:border-cyan-300/30 hover:text-cyan-300"
-      >
-        <CalendarPlus className="h-3.5 w-3.5" />
-        Saisir ce jour
-      </button>
     </div>
   );
 }
 
 export function CongestionForecast() {
   const { store, selectedDate } = useLogistics();
-  const { days, pending } = useMemo(
-    () => computeForecastChain(store, selectedDate, 3),
+  const chain = useMemo(
+    () => computeForecastChain(store, selectedDate, HORIZON_DAYS),
     [store, selectedDate],
   );
 
-  const lastKnown = days[days.length - 1];
+  const realCount = chain.filter((d) => d.source === "real").length;
+  const predictedCount = chain.length - realCount;
+  const lastKnown = chain[chain.length - 1];
   const isSnowballing = Boolean(lastKnown?.congested);
+  const isSiloSnowballing = Boolean(lastKnown?.siloCongested);
+  const anySnowballing = isSnowballing || isSiloSnowballing;
+
+  const messages: string[] = [];
+  if (lastKnown?.congested) {
+    messages.push(`${formatHoursMinutes(lastKnown.backlogOut)} humain`);
+  }
+  if (lastKnown?.siloCongested) {
+    messages.push(`${formatHoursMinutes(lastKnown.siloBacklogOut)} silo`);
+  }
 
   return (
-    <GlassCard delay={0.15} className="col-span-full" glowColor={isSnowballing ? "orange" : "cyan"}>
+    <GlassCard delay={0.15} className="col-span-full" glowColor={anySnowballing ? "orange" : "cyan"}>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <SectionTitle
           icon={<Snowflake className="h-5 w-5" strokeWidth={2} />}
-          title="Vision 72h · effet boule de neige"
-          subtitle="Report de la charge non absorbée, jour après jour saisi"
+          title="Vision semaine · effet boule de neige"
+          subtitle={`${realCount} jour${realCount > 1 ? "s" : ""} saisi${realCount > 1 ? "s" : ""} · ${predictedCount} prédit${predictedCount > 1 ? "s" : ""} à partir de l'historique`}
         />
         <span
           className={clsx(
             "rounded-full px-3 py-1.5 text-xs font-medium",
-            isSnowballing
-              ? "bg-rose-500/10 text-rose-300"
-              : "bg-emerald-500/10 text-emerald-300",
+            anySnowballing ? "bg-rose-500/10 text-rose-300" : "bg-emerald-500/10 text-emerald-300",
           )}
         >
-          {isSnowballing
-            ? `Congestion — ${formatHoursMinutes(lastKnown.backlogOut)} non absorbées après le ${formatDayLabel(lastKnown.date)}`
-            : "Aucune accumulation sur les jours saisis"}
+          {anySnowballing
+            ? `Congestion — ${messages.join(" + ")} non absorbées après le ${formatDayLabel(lastKnown.date)}`
+            : "Aucune accumulation sur l'horizon"}
         </span>
       </div>
 
@@ -169,35 +167,17 @@ export function CongestionForecast() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4 }}
-        className="mt-3 flex flex-col items-stretch gap-2 md:flex-row md:items-center"
+        className="mt-3 flex items-stretch gap-2 overflow-x-auto pb-1"
       >
-        {days.map((day, i) => (
-          <div key={day.date} className="flex flex-1 flex-col items-center gap-2 md:flex-row">
-            <DayColumn day={day} />
-            {(i < days.length - 1 || pending.length > 0) && (
-              <div
-                className={clsx(
-                  "flex shrink-0 items-center justify-center",
-                  day.congested ? "text-rose-400" : "text-slate-700",
-                )}
-              >
-                <ArrowDown className="h-4 w-4 md:hidden" />
-                <ArrowRight className="hidden h-4 w-4 md:block" />
-              </div>
-            )}
-          </div>
+        {chain.map((day) => (
+          <DayCard key={day.date} day={day} />
         ))}
-        {pending.map((day, i) => (
-          <div key={day.date} className="flex flex-1 flex-col items-center gap-2 md:flex-row">
-            <PendingColumn day={day} />
-            {i < pending.length - 1 && (
-              <div className="flex shrink-0 items-center justify-center text-slate-700">
-                <ArrowDown className="h-4 w-4 md:hidden" />
-                <ArrowRight className="hidden h-4 w-4 md:block" />
-              </div>
-            )}
-          </div>
-        ))}
+        {chain.length === 0 && (
+          <p className="py-4 text-sm text-slate-500">
+            Aucune donnée à projeter — saisissez au moins une journée pour démarrer la
+            prévision.
+          </p>
+        )}
       </motion.div>
     </GlassCard>
   );

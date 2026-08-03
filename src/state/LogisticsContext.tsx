@@ -25,11 +25,16 @@ const DEFAULT_TEAMS: TeamConfig[] = [
 
 // Seules les cadences sont préremplies (valeurs machine/process typiques) ;
 // volumes du jour et effectifs démarrent à 0, à saisir pour chaque journée.
+// Fenêtre silo par défaut : 2 équipes de 7h36 (matin + après-midi), le cas le plus
+// courant. Ajustable si le silo tourne davantage (2×8h, 3×8h, samedi en plus...).
+export const DEFAULT_SILO_WINDOW_HOURS = 2 * 7.6;
+
 export const DEFAULT_INPUTS: LogisticsInputs = {
   siloPalettes: 0,
   siloCadence: 18,
   siloEfficiencyPct: 100,
   siloDowntimeHours: 0,
+  siloWindowHours: DEFAULT_SILO_WINDOW_HOURS,
   pickingColis: 0,
   pickingCadence: 400,
   pickingEfficiencyPct: 100,
@@ -47,6 +52,7 @@ interface LogisticsContextValue {
   setSiloCadence: (v: number) => void;
   setSiloEfficiencyPct: (v: number) => void;
   setSiloDowntimeHours: (v: number) => void;
+  setSiloWindowHours: (v: number) => void;
   setPickingColis: (v: number) => void;
   setPickingCadence: (v: number) => void;
   setPickingEfficiencyPct: (v: number) => void;
@@ -103,6 +109,8 @@ export function LogisticsProvider({ children }: { children: ReactNode }) {
       updateCurrent((prev) => ({ ...prev, siloEfficiencyPct: Math.max(0, v) })),
     setSiloDowntimeHours: (v) =>
       updateCurrent((prev) => ({ ...prev, siloDowntimeHours: Math.max(0, v) })),
+    setSiloWindowHours: (v) =>
+      updateCurrent((prev) => ({ ...prev, siloWindowHours: Math.max(0, v) })),
     setPickingColis: (v) => updateCurrent((prev) => ({ ...prev, pickingColis: Math.max(0, v) })),
     setPickingCadence: (v) =>
       updateCurrent((prev) => ({ ...prev, pickingCadence: Math.max(0, v) })),

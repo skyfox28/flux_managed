@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { ArrowDownRight, ArrowUpRight, Boxes, Snowflake } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Boxes, Clock4, Snowflake } from "lucide-react";
 import clsx from "clsx";
 import { GlassCard } from "../ui/GlassCard";
 import { SectionTitle } from "../ui/StatRow";
 import { useLogistics } from "../../state/LogisticsContext";
 import { computeForecastChain, type DayForecast } from "../../lib/backlog";
+import { computeFinishEstimate } from "../../lib/schedule";
 import { formatDayLabel, formatHoursMinutes, formatPercent } from "../../lib/format";
 
 const HORIZON_DAYS = 7;
@@ -18,6 +19,7 @@ const STATUS_STYLE: Record<string, { text: string; bar: string; ring: string }> 
 
 function DayCard({ day }: { day: DayForecast }) {
   const style = STATUS_STYLE[day.status];
+  const finish = computeFinishEstimate(day.own, day.totalCharge);
   const capacity = day.own.totalCapacityHours || 1;
   // Au-delà de la capacité, on normalise les deux segments sur le total à traiter
   // (au lieu de plafonner le report seul) pour que la sévérité (couleur du statut)
@@ -75,6 +77,18 @@ function DayCard({ day }: { day: DayForecast }) {
             {formatHoursMinutes(day.siloBacklogOut)} silo en attente
           </span>
         )}
+      </div>
+
+      <div
+        className={clsx(
+          "flex items-center gap-1 border-t border-white/5 pt-1.5 text-[10px] font-medium",
+          finish.overflows || finish.isLate ? "text-rose-300" : "text-slate-400",
+        )}
+      >
+        <Clock4 className="h-3 w-3 shrink-0" />
+        {finish.overflows
+          ? `Empiète +${formatHoursMinutes(finish.overflowHours)} sur demain`
+          : `Terminé à ${finish.finishLabel}`}
       </div>
     </div>
   );

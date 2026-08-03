@@ -3,9 +3,11 @@ import { GlassCard } from "../ui/GlassCard";
 import { SectionTitle, StatRow } from "../ui/StatRow";
 import { useLogistics } from "../../state/LogisticsContext";
 import { formatHoursMinutes, formatPercent } from "../../lib/format";
+import { computeFinishEstimate, LATE_SHIPPING_HOUR } from "../../lib/schedule";
 
 export function CapacitySummaryCard() {
   const { derived } = useLogistics();
+  const finish = computeFinishEstimate(derived);
 
   return (
     <GlassCard delay={0.2} glowColor={derived.status === "critical" ? "orange" : "cyan"}>
@@ -49,6 +51,23 @@ export function CapacitySummaryCard() {
             : "Aucune"
         }
       />
+      {finish.overflows ? (
+        <StatRow
+          label="Fin silo + picking"
+          value={`Déborde de ${formatHoursMinutes(finish.overflowHours)} sur le lendemain`}
+          tone="critical"
+        />
+      ) : (
+        <StatRow
+          label="Fin silo + picking"
+          value={
+            finish.isLate
+              ? `${finish.finishLabel} — après ${LATE_SHIPPING_HOUR}h, chargement peu probable`
+              : `${finish.finishLabel} (fin de poste ${finish.dayEndLabel})`
+          }
+          tone={finish.isLate ? "critical" : undefined}
+        />
+      )}
     </GlassCard>
   );
 }

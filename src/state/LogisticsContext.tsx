@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import type { LogisticsInputs, TeamConfig } from "../types/logistics";
-import { computeLogistics } from "../lib/calculations";
+import { BREAK_HOURS_PER_SHIFT, computeLogistics } from "../lib/calculations";
 import type { LogisticsDerived } from "../types/logistics";
 import { loadDays, saveDays, todayISO, type DaysStore } from "../lib/storage";
 
@@ -25,9 +25,11 @@ const DEFAULT_TEAMS: TeamConfig[] = [
 
 // Seules les cadences sont préremplies (valeurs machine/process typiques) ;
 // volumes du jour et effectifs démarrent à 0, à saisir pour chaque journée.
-// Fenêtre silo par défaut : 2 équipes de 7h36 (matin + après-midi), le cas le plus
-// courant. Ajustable si le silo tourne davantage (2×8h, 3×8h, samedi en plus...).
-export const DEFAULT_SILO_WINDOW_HOURS = 2 * 7.6;
+// Fenêtre silo par défaut : 2 équipes de 7h36 (matin + après-midi), pauses déduites
+// (10 + 20 min par équipe) — le cas le plus courant. Ajustable si le silo tourne
+// davantage (2×8h, 3×8h, samedi en plus...).
+export const SILO_SHIFT_HOURS = 7.6;
+export const DEFAULT_SILO_WINDOW_HOURS = 2 * (SILO_SHIFT_HOURS - BREAK_HOURS_PER_SHIFT);
 
 export const DEFAULT_INPUTS: LogisticsInputs = {
   siloPalettes: 0,

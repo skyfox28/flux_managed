@@ -3,7 +3,7 @@ import { GlassCard } from "../ui/GlassCard";
 import { SectionTitle, StatRow } from "../ui/StatRow";
 import { AnimatedNumber } from "../ui/AnimatedNumber";
 import { useLogistics } from "../../state/LogisticsContext";
-import { formatHoursMinutes } from "../../lib/format";
+import { formatHoursMinutes, formatInt } from "../../lib/format";
 
 export function PickingCard() {
   const { inputs, derived } = useLogistics();
@@ -29,6 +29,11 @@ export function PickingCard() {
         />
       )}
       <StatRow label="Préparateurs dispo" value={derived.totalPreparateurs} />
+      <StatRow
+        label="Colis max / jour"
+        value={formatInt(Math.ceil(derived.totalCapacityHours * derived.pickingEffectiveCadence))}
+        accent
+      />
       <StatRow
         label="Temps estimé (parallèle)"
         value={formatHoursMinutes(derived.pickingTimeHours)}

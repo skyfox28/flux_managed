@@ -2,6 +2,7 @@ import { LogisticsProvider } from "./state/LogisticsContext";
 import { Header } from "./components/layout/Header";
 import { DayBar } from "./components/dashboard/DayBar";
 import { AlertBanner } from "./components/dashboard/AlertBanner";
+import { RecommendationsPanel } from "./components/dashboard/RecommendationsPanel";
 import { GaugePanel } from "./components/dashboard/GaugePanel";
 import { FlowScenePanel } from "./components/dashboard/FlowScenePanel";
 import { SiloCard } from "./components/dashboard/SiloCard";
@@ -24,6 +25,7 @@ function App() {
         <Header />
         <DayBar />
         <AlertBanner />
+        <RecommendationsPanel />
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[340px_1fr]">
           <ControlPanel />

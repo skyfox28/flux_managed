@@ -13,6 +13,12 @@ import { SectionTitle } from "../ui/StatRow";
 import { SliderField } from "./SliderField";
 import { useLogistics } from "../../state/LogisticsContext";
 import { formatHoursMinutes } from "../../lib/format";
+import { BREAK_HOURS_PER_SHIFT } from "../../lib/calculations";
+
+/** Fenêtre nette = n équipes × (durée du poste − pauses 10+20min), comme pour les équipes humaines. */
+function netShiftHours(shifts: number, shiftLength: number): number {
+  return shifts * Math.max(0, shiftLength - BREAK_HOURS_PER_SHIFT);
+}
 
 export function ControlPanel() {
   const {
@@ -100,13 +106,14 @@ export function ControlPanel() {
           icon={<Clock className="h-3.5 w-3.5" />}
           onChange={setSiloWindowHours}
         />
+        <p className="text-[10px] text-slate-600">Pauses (10+20min) déjà déduites par équipe.</p>
         <div className="flex flex-wrap gap-1.5 pb-1">
           {[
-            { label: "2×7h36", hours: 2 * 7.6 },
-            { label: "2×8h", hours: 2 * 8 },
-            { label: "3×7h36", hours: 3 * 7.6 },
-            { label: "3×8h", hours: 3 * 8 },
-            { label: "+6h samedi", hours: inputs.siloWindowHours + 6 },
+            { label: "2×7h36", hours: netShiftHours(2, 7.6) },
+            { label: "2×8h", hours: netShiftHours(2, 8) },
+            { label: "3×7h36", hours: netShiftHours(3, 7.6) },
+            { label: "3×8h", hours: netShiftHours(3, 8) },
+            { label: "+6h samedi", hours: inputs.siloWindowHours + netShiftHours(1, 6) },
           ].map((preset) => (
             <button
               key={preset.label}

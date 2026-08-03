@@ -3,7 +3,7 @@ import { GlassCard } from "../ui/GlassCard";
 import { SectionTitle, StatRow } from "../ui/StatRow";
 import { AnimatedNumber } from "../ui/AnimatedNumber";
 import { useLogistics } from "../../state/LogisticsContext";
-import { formatHoursMinutes } from "../../lib/format";
+import { formatHoursMinutes, formatInt } from "../../lib/format";
 
 export function SiloCard() {
   const { inputs, derived } = useLogistics();
@@ -38,6 +38,11 @@ export function SiloCard() {
       <StatRow
         label="Fenêtre silo (fonctionnement/j)"
         value={formatHoursMinutes(inputs.siloWindowHours)}
+      />
+      <StatRow
+        label="Palettes max / jour"
+        value={formatInt(Math.ceil(inputs.siloWindowHours * derived.siloEffectiveCadence))}
+        accent
       />
       <StatRow
         label="Temps nécessaire (brut)"
